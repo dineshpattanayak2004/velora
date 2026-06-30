@@ -6,10 +6,11 @@ const PERMISSION_KEY = "velora_system_permission";
 
 let batteryRef = null;
 let cpuSamples = [];
-const CPU_HISTORY_MAX = 30; // Last 30 readings for chart
+const CPU_HISTORY_MAX = 30;
 let cpuHistory = [];
+let batteryHistory = []; // { level, timestamp }
 
-/* ===== BATTERY ===== */
+/* ===== BATTERY: REAL-TIME DRAIN RATE CALCULATION ===== */
 async function getBatteryInfo() {
   try {
     if ("getBattery" in navigator) {
@@ -17,13 +18,17 @@ async function getBatteryInfo() {
       const b = batteryRef;
       const level = Math.round(b.level * 100);
       const charging = b.charging;
+
+      // Track history for real drain rate
+      const now = Date.now();
+      batteryHistory.push({ level, timestamp: now });
+      if (batteryHistory.length > 20) batteryHistory.shift();
+
       let timeLeft = "🔋 Calculating...";
       let timeHours = 0, timeMinutes = 0;
 
-      const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      const avgMinutesFull = isMobile ? 480 : 300;
-
       if (charging) {
+        // Charging - estimate time to full
         if (b.chargingTime !== Infinity && b.chargingTime > 0 && !isNaN(b.chargingTime)) {
           const totalMin = Math.round(b.chargingTime / 60);
           timeHours = Math.floor(totalMin / 60);
@@ -32,35 +37,58 @@ async function getBatteryInfo() {
         } else if (level >= 99) {
           timeLeft = "⚡ Fully charged!";
         } else {
+          // Estimate based on typical charge rate (~1% per 2-3 minutes)
           const remainingPct = 100 - level;
-          const estMin = Math.round((remainingPct / 100) * 60);
+          const estMin = remainingPct * 2; // ~2 min per %
           timeHours = Math.floor(estMin / 60);
           timeMinutes = estMin % 60;
           timeLeft = timeHours > 0 ? `~${timeHours}h ${timeMinutes}m to full` : timeMinutes > 0 ? `~${timeMinutes}m to full` : "⚡ Almost full!";
         }
       } else {
-        if (b.dischargingTime !== Infinity && b.dischargingTime > 0 && !isNaN(b.dischargingTime)) {
+        // DISCHARGING - calculate real drain rate
+        if (batteryHistory.length >= 2) {
+          // Find oldest and newest readings
+          const oldest = batteryHistory[0];
+          const newest = batteryHistory[batteryHistory.length - 1];
+          const timeDiff = (newest.timestamp - oldest.timestamp) / 60000; // minutes
+          const levelDiff = oldest.level - newest.level; // % lost
+
+          if (timeDiff > 0.5 && levelDiff > 0) {
+            // Real drain rate: % per minute
+            const drainRate = levelDiff / timeDiff;
+            const remainingPct = level;
+            const estMinutes = Math.round(remainingPct / drainRate);
+            
+            timeHours = Math.floor(estMinutes / 60);
+            timeMinutes = estMinutes % 60;
+            
+            if (timeHours > 0) timeLeft = `~${timeHours}h ${timeMinutes}m remaining`;
+            else if (timeMinutes > 1) timeLeft = `~${timeMinutes}m remaining`;
+            else timeLeft = "⚠️ Less than 1 minute!";
+          } else if (level <= 10) {
+            timeLeft = "⚠️ Battery critically low!";
+          } else {
+            timeLeft = "📊 Collecting data...";
+          }
+        } else if (b.dischargingTime !== Infinity && b.dischargingTime > 0 && !isNaN(b.dischargingTime)) {
           const totalMin = Math.round(b.dischargingTime / 60);
           timeHours = Math.floor(totalMin / 60);
           timeMinutes = totalMin % 60;
           timeLeft = timeHours > 0 ? `${timeHours}h ${timeMinutes}m remaining` : timeMinutes > 1 ? `${timeMinutes}m remaining` : "⚠️ Less than 1 minute!";
-        } else if (level > 0) {
-          const estMin = Math.round((level / 100) * avgMinutesFull);
-          timeHours = Math.floor(estMin / 60);
-          timeMinutes = estMin % 60;
-          timeLeft = timeHours > 0 ? `~${timeHours}h ${timeMinutes}m remaining` : timeMinutes > 1 ? `~${timeMinutes}m remaining` : "⚠️ Very low battery!";
+        } else if (level <= 10) {
+          timeLeft = "⚠️ Battery critically low!";
         } else {
-          timeLeft = "🪫 Battery critical!";
+          timeLeft = "📊 Collecting data...";
         }
       }
 
-      return { percent: level, power_plugged: charging, time_left: timeLeft, time_hours: timeHours, time_minutes: timeMinutes };
+      return { percent: level, power_plugged: charging, time_left: timeLeft, time_hours: timeHours, time_minutes: timeMinutes, drain_rate: batteryHistory.length >= 2 ? (batteryHistory[0].level - batteryHistory[batteryHistory.length - 1].level) / ((batteryHistory[batteryHistory.length - 1].timestamp - batteryHistory[0].timestamp) / 60000) : null };
     }
   } catch { /* Battery API unavailable */ }
-  return { percent: null, power_plugged: null, time_left: "🔌 No Battery", time_hours: 0, time_minutes: 0 };
+  return { percent: null, power_plugged: null, time_left: "🔌 No Battery", time_hours: 0, time_minutes: 0, drain_rate: null };
 }
 
-/* ===== CPU: REAL BENCHMARK + HISTORY ===== */
+/* ===== CPU ===== */
 function getCPUUsage() {
   const cores = navigator.hardwareConcurrency || 4;
   const start = performance.now();
@@ -71,11 +99,8 @@ function getCPUUsage() {
   if (cpuSamples.length > 6) cpuSamples.shift();
   const avg = cpuSamples.reduce((a, b) => a + b, 0) / cpuSamples.length;
   const percent = Math.min(Math.round(avg * 100), 100);
-
-  // Update history
   cpuHistory.push(percent);
   if (cpuHistory.length > CPU_HISTORY_MAX) cpuHistory.shift();
-
   return { percent, cores, frequency: `${cores} cores` };
 }
 
@@ -134,7 +159,7 @@ function PermissionPopup({ onAllow, onDeny }) {
           <ul className="space-y-1">
             <li className="hover:text-slate-300 transition-colors">⚡ <strong>CPU</strong> — Real cores & live benchmark</li>
             <li className="hover:text-slate-300 transition-colors">💾 <strong>Memory</strong> — RAM used / total</li>
-            <li className="hover:text-slate-300 transition-colors">🔋 <strong>Battery</strong> — % & hours remaining</li>
+            <li className="hover:text-slate-300 transition-colors">🔋 <strong>Battery</strong> — Real-time drain rate & time remaining</li>
             <li className="hover:text-slate-300 transition-colors">📱 <strong>Device</strong> — Mobile/Desktop detect</li>
           </ul>
           <p className="mt-2 text-slate-600 text-[10px]">All data stays local. Nothing is sent anywhere.</p>
@@ -174,73 +199,60 @@ function StatCard({ label, value, sub, color, progress }) {
   );
 }
 
-/* ===== CPU LINE CHART (Data Analyst Theme) ===== */
+/* ===== CPU LINE CHART ===== */
 function CPUChart({ history, current }) {
   if (!history || history.length < 2) return null;
-
-  const width = 100;
-  const height = 60;
-  const padding = 4;
-
-  const points = history.map((val, i) => {
-    const x = padding + (i / (history.length - 1)) * (width - 2 * padding);
-    const y = height - padding - (val / 100) * (height - 2 * padding);
-    return { x, y, val };
-  });
-
-  const pathD = points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+  const width = 100, height = 60, padding = 4;
+  const points = history.map((val, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (val / 100) * (height - 2 * padding), val }));
+  const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
   const areaD = pathD + ` L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
-
   const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
   const max = Math.max(...history);
   const min = Math.min(...history);
-
   return (
     <div className="glass p-3 md:p-4 rounded-xl border border-cyan-400/20 transition-all duration-300 hover:border-cyan-400/40">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-cyan-400 font-semibold text-sm flex items-center gap-2">
-          <span>📈</span> CPU Usage Analytics
-        </h3>
+        <h3 className="text-cyan-400 font-semibold text-sm flex items-center gap-2"><span>📈</span> CPU Usage Analytics</h3>
         <div className="flex gap-2 text-[10px]">
           <span className="text-slate-500">Avg: <span className="text-cyan-400 font-medium">{avg}%</span></span>
           <span className="text-slate-500">Peak: <span className="text-red-400 font-medium">{max}%</span></span>
           <span className="text-slate-500">Min: <span className="text-green-400 font-medium">{min}%</span></span>
         </div>
       </div>
-
-      {/* Chart */}
       <div className="relative w-full bg-slate-900/50 rounded-lg p-2 border border-slate-700/30">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" preserveAspectRatio="none">
-          {/* Grid lines */}
-          {[0, 25, 50, 75, 100].map(tick => (
-            <line key={tick} x1={padding} x2={width - padding} y1={height - padding - (tick / 100) * (height - 2 * padding)} y2={height - padding - (tick / 100) * (height - 2 * padding)} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-          ))}
-          {/* Area fill */}
+          {[0, 25, 50, 75, 100].map(tick => <line key={tick} x1={padding} x2={width - padding} y1={height - padding - (tick / 100) * (height - 2 * padding)} y2={height - padding - (tick / 100) * (height - 2 * padding)} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />)}
           <path d={areaD} fill="url(#cpuGradient)" opacity="0.3" />
-          {/* Line */}
           <path d={pathD} fill="none" stroke="url(#cpuLineGradient)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          {/* Current point */}
-          {points.length > 0 && (
-            <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.5" fill="#00E5FF" className="animate-pulse" />
-          )}
-          {/* Gradient definitions */}
+          {points.length > 0 && <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.5" fill="#00E5FF" className="animate-pulse" />}
           <defs>
-            <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#00E5FF" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="cpuLineGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#00E5FF" />
-              <stop offset="100%" stopColor="#a855f7" />
-            </linearGradient>
+            <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00E5FF" stopOpacity="0.4" /><stop offset="100%" stopColor="#00E5FF" stopOpacity="0" /></linearGradient>
+            <linearGradient id="cpuLineGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#00E5FF" /><stop offset="100%" stopColor="#a855f7" /></linearGradient>
           </defs>
         </svg>
       </div>
-
-      {/* Stats footer */}
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600">
         <span>Last {history.length} readings</span>
         <span>Current: <span className="text-cyan-400 font-medium">{current}%</span></span>
+      </div>
+    </div>
+  );
+}
+
+/* ===== BATTERY DRAIN CHART ===== */
+function BatteryChart({ history }) {
+  if (!history || history.length < 2) return null;
+  const width = 100, height = 40, padding = 4;
+  const points = history.map((h, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (h.level / 100) * (height - 2 * padding) }));
+  const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
+  return (
+    <div className="glass p-3 rounded-xl border border-yellow-400/20 transition-all duration-300 hover:border-yellow-400/40">
+      <h3 className="text-yellow-400 font-semibold text-xs flex items-center gap-2 mb-2"><span>🔋</span> Battery Level Trend</h3>
+      <div className="relative w-full bg-slate-900/50 rounded-lg p-2 border border-slate-700/30">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" preserveAspectRatio="none">
+          <path d={pathD} fill="none" stroke="#facc15" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          {points.length > 0 && <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.5" fill="#facc15" className="animate-pulse" />}
+        </svg>
       </div>
     </div>
   );
@@ -339,7 +351,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 lg:gap-4 mb-4 animate-fadeIn">
               <StatCard label="CPU Usage" value={loading ? <span className="animate-pulse">--</span> : `${d?.cpu?.percent || 0}%`} sub={`${d?.cpu?.cores || 0} cores`} color={cpuColor(d?.cpu?.percent || 0)} progress={d?.cpu?.percent || 0} />
               <StatCard label="Memory" value={loading ? <span className="animate-pulse">--</span> : `${d?.memory?.percent?.toFixed(1) || 0}%`} sub={loading ? "" : `${d?.memory?.used_gb || 0} / ${d?.memory?.total_gb || 0} GB`} color={memColor(d?.memory?.percent || 0)} progress={d?.memory?.percent || 0} />
-              <StatCard label="Battery" value={loading ? <span className="animate-pulse">--</span> : d?.battery?.percent != null ? `${d.battery.percent}%` : "🔌 N/A"} sub={d?.battery?.time_left?.substring(0, 30) || ""} color={d?.battery?.percent != null ? (d.battery.percent > 50 ? "text-green-400" : d.battery.percent > 20 ? "text-yellow-400" : "text-red-400") : "text-slate-400"} progress={d?.battery?.percent || 0} />
+              <StatCard label="Battery" value={loading ? <span className="animate-pulse">--</span> : d?.battery?.percent != null ? `${d.battery.percent}%` : "🔌 N/A"} sub={d?.battery?.time_left?.substring(0, 35) || ""} color={d?.battery?.percent != null ? (d.battery.percent > 50 ? "text-green-400" : d.battery.percent > 20 ? "text-yellow-400" : "text-red-400") : "text-slate-400"} progress={d?.battery?.percent || 0} />
               <StatCard label="Storage" value={loading ? <span className="animate-pulse">--</span> : `${d?.disk?.percent?.toFixed(1) || 0}%`} sub={d?.disk?.total_gb ? `${d?.disk?.used_gb || 0} / ${d?.disk?.total_gb} GB` : "Loading..."} progress={d?.disk?.percent || 0} />
             </div>
 
@@ -356,6 +368,9 @@ export default function Dashboard() {
                           {d.battery.power_plugged ? "⚡ Charging" : "🔋 Discharging"}
                         </span>
                       </div>
+                      {d.battery.drain_rate != null && !d.battery.power_plugged && (
+                        <p className="text-slate-500 text-xs mt-1">Drain rate: <span className="text-red-400">{d.battery.drain_rate.toFixed(2)}%/min</span></p>
+                      )}
                     </div>
                   </div>
                   <div className="text-left sm:text-right bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/30">
@@ -371,10 +386,17 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* CPU Analytics Chart - Data Analyst Theme */}
+            {/* CPU Analytics */}
             <div className="mb-4 animate-fadeIn">
               <CPUChart history={cpuHistory} current={d?.cpu?.percent || 0} />
             </div>
+
+            {/* Battery Trend */}
+            {batteryHistory.length > 2 && (
+              <div className="mb-4 animate-fadeIn">
+                <BatteryChart history={batteryHistory} />
+              </div>
+            )}
 
             {/* System Monitor */}
             <div className="glass p-3 md:p-5 lg:p-6 rounded-xl border border-transparent hover:border-cyan-400/10 transition-all duration-300 animate-fadeIn">
