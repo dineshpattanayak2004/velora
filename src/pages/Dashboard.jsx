@@ -394,17 +394,11 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* CPU Analytics */}
-            <div className="mb-4 animate-fadeIn">
+            {/* CPU + Battery Analytics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 animate-fadeIn">
               <CPUChart history={cpuHistory} current={d?.cpu?.percent || 0} />
+              {batteryHistory.length > 2 && <BatteryChart history={batteryHistory} />}
             </div>
-
-            {/* Battery Trend */}
-            {batteryHistory.length > 2 && (
-              <div className="mb-4 animate-fadeIn">
-                <BatteryChart history={batteryHistory} />
-              </div>
-            )}
 
             {/* System Monitor */}
             <div className="glass p-3 md:p-5 lg:p-6 rounded-xl border border-transparent hover:border-cyan-400/10 transition-all duration-300 animate-fadeIn">
