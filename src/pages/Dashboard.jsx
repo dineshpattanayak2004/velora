@@ -8,9 +8,9 @@ let batteryRef = null;
 let cpuSamples = [];
 const CPU_HISTORY_MAX = 30;
 let cpuHistory = [];
-let batteryHistory = []; // { level, timestamp }
+let batteryHistory = [];
 
-/* ===== BATTERY: REAL-TIME DRAIN RATE CALCULATION ===== */
+/* ===== BATTERY: FAST RESPONSE ===== */
 async function getBatteryInfo() {
   try {
     if ("getBattery" in navigator) {
@@ -19,7 +19,6 @@ async function getBatteryInfo() {
       const level = Math.round(b.level * 100);
       const charging = b.charging;
 
-      // Track history for real drain rate
       const now = Date.now();
       batteryHistory.push({ level, timestamp: now });
       if (batteryHistory.length > 20) batteryHistory.shift();
@@ -28,7 +27,6 @@ async function getBatteryInfo() {
       let timeHours = 0, timeMinutes = 0;
 
       if (charging) {
-        // Charging - estimate time to full
         if (b.chargingTime !== Infinity && b.chargingTime > 0 && !isNaN(b.chargingTime)) {
           const totalMin = Math.round(b.chargingTime / 60);
           timeHours = Math.floor(totalMin / 60);
@@ -37,24 +35,21 @@ async function getBatteryInfo() {
         } else if (level >= 99) {
           timeLeft = "⚡ Fully charged!";
         } else {
-          // Estimate based on typical charge rate (~1% per 2-3 minutes)
           const remainingPct = 100 - level;
-          const estMin = remainingPct * 2; // ~2 min per %
+          const estMin = remainingPct * 2;
           timeHours = Math.floor(estMin / 60);
           timeMinutes = estMin % 60;
           timeLeft = timeHours > 0 ? `~${timeHours}h ${timeMinutes}m to full` : timeMinutes > 0 ? `~${timeMinutes}m to full` : "⚡ Almost full!";
         }
       } else {
-        // DISCHARGING - calculate real drain rate
+        // DISCHARGING - FAST calculation
         if (batteryHistory.length >= 2) {
-          // Find oldest and newest readings
-          const oldest = batteryHistory[0];
           const newest = batteryHistory[batteryHistory.length - 1];
-          const timeDiff = (newest.timestamp - oldest.timestamp) / 60000; // minutes
-          const levelDiff = oldest.level - newest.level; // % lost
+          const prev = batteryHistory[batteryHistory.length - 2]; // Use last 2 readings only
+          const timeDiff = (newest.timestamp - prev.timestamp) / 60000; // minutes
+          const levelDiff = prev.level - newest.level; // % lost
 
-          if (timeDiff > 0.5 && levelDiff > 0) {
-            // Real drain rate: % per minute
+          if (timeDiff > 0.05 && levelDiff > 0) { // Just 3 seconds enough!
             const drainRate = levelDiff / timeDiff;
             const remainingPct = level;
             const estMinutes = Math.round(remainingPct / drainRate);
@@ -68,7 +63,13 @@ async function getBatteryInfo() {
           } else if (level <= 10) {
             timeLeft = "⚠️ Battery critically low!";
           } else {
-            timeLeft = "📊 Collecting data...";
+            // Show immediate estimate based on level
+            const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const avgMinutes = isMobile ? 480 : 300;
+            const estMin = Math.round((level / 100) * avgMinutes);
+            timeHours = Math.floor(estMin / 60);
+            timeMinutes = estMin % 60;
+            timeLeft = timeHours > 0 ? `~${timeHours}h ${timeMinutes}m` : `~${timeMinutes}m`;
           }
         } else if (b.dischargingTime !== Infinity && b.dischargingTime > 0 && !isNaN(b.dischargingTime)) {
           const totalMin = Math.round(b.dischargingTime / 60);
@@ -78,11 +79,18 @@ async function getBatteryInfo() {
         } else if (level <= 10) {
           timeLeft = "⚠️ Battery critically low!";
         } else {
-          timeLeft = "📊 Collecting data...";
+          // Immediate estimate
+          const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const avgMinutes = isMobile ? 480 : 300;
+          const estMin = Math.round((level / 100) * avgMinutes);
+          timeHours = Math.floor(estMin / 60);
+          timeMinutes = estMin % 60;
+          timeLeft = timeHours > 0 ? `~${timeHours}h ${timeMinutes}m` : `~${timeMinutes}m`;
         }
       }
 
-      return { percent: level, power_plugged: charging, time_left: timeLeft, time_hours: timeHours, time_minutes: timeMinutes, drain_rate: batteryHistory.length >= 2 ? (batteryHistory[0].level - batteryHistory[batteryHistory.length - 1].level) / ((batteryHistory[batteryHistory.length - 1].timestamp - batteryHistory[0].timestamp) / 60000) : null };
+      const drainRate = batteryHistory.length >= 2 ? (batteryHistory[0].level - batteryHistory[batteryHistory.length - 1].level) / ((batteryHistory[batteryHistory.length - 1].timestamp - batteryHistory[0].timestamp) / 60000) : null;
+      return { percent: level, power_plugged: charging, time_left: timeLeft, time_hours: timeHours, time_minutes: timeMinutes, drain_rate: drainRate };
     }
   } catch { /* Battery API unavailable */ }
   return { percent: null, power_plugged: null, time_left: "🔌 No Battery", time_hours: 0, time_minutes: 0, drain_rate: null };
