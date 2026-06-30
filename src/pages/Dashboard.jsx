@@ -207,50 +207,40 @@ function StatCard({ label, value, sub, color, progress }) {
   );
 }
 
-/* ===== CPU LINE CHART (Mini Card) ===== */
+/* ===== CPU LINE CHART (Micro) ===== */
 function CPUChart({ history, current }) {
   if (!history || history.length < 2) return null;
-  const width = 100, height = 25, padding = 1;
-  const points = history.map((val, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (val / 100) * (height - 2 * padding), val }));
+  const width = 100, height = 15, padding = 1;
+  const points = history.map((val, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (val / 100) * (height - 2 * padding) }));
   const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
-  const areaD = pathD + ` L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
   const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
   const max = Math.max(...history);
-  const min = Math.min(...history);
   return (
-    <div className="glass p-3 md:p-4 rounded-xl border border-cyan-400/20 transition-all duration-300 hover:border-cyan-400/40">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-cyan-400 font-semibold text-sm flex items-center gap-2"><span>📈</span> CPU Usage Analytics</h3>
-        <div className="flex gap-2 text-[10px]">
-          <span className="text-slate-500">Avg: <span className="text-cyan-400 font-medium">{avg}%</span></span>
-          <span className="text-slate-500">Peak: <span className="text-red-400 font-medium">{max}%</span></span>
-          <span className="text-slate-500">Min: <span className="text-green-400 font-medium">{min}%</span></span>
+    <div className="glass p-2 md:p-3 rounded-lg border border-cyan-400/20 transition-all duration-300 hover:border-cyan-400/40">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-cyan-400 font-semibold text-xs flex items-center gap-1"><span>📈</span> CPU</h3>
+        <div className="flex gap-1.5 text-[9px]">
+          <span className="text-slate-500">Avg <span className="text-cyan-400">{avg}%</span></span>
+          <span className="text-slate-500">Peak <span className="text-red-400">{max}%</span></span>
         </div>
       </div>
-      <div className="relative w-full bg-slate-900/50 rounded-lg p-2 border border-slate-700/30">
+      <div className="relative w-full bg-slate-900/50 rounded p-1.5 border border-slate-700/30">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" preserveAspectRatio="none">
-          {[0, 25, 50, 75, 100].map(tick => <line key={tick} x1={padding} x2={width - padding} y1={height - padding - (tick / 100) * (height - 2 * padding)} y2={height - padding - (tick / 100) * (height - 2 * padding)} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />)}
-          <path d={areaD} fill="url(#cpuGradient)" opacity="0.3" />
-          <path d={pathD} fill="none" stroke="url(#cpuLineGradient)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          {points.length > 0 && <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.5" fill="#00E5FF" className="animate-pulse" />}
+          <path d={pathD} fill="none" stroke="url(#cpuLineGradient)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+          {points.length > 0 && <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1" fill="#00E5FF" className="animate-pulse" />}
           <defs>
-            <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00E5FF" stopOpacity="0.4" /><stop offset="100%" stopColor="#00E5FF" stopOpacity="0" /></linearGradient>
             <linearGradient id="cpuLineGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#00E5FF" /><stop offset="100%" stopColor="#a855f7" /></linearGradient>
           </defs>
         </svg>
-      </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600">
-        <span>Last {history.length} readings</span>
-        <span>Current: <span className="text-cyan-400 font-medium">{current}%</span></span>
       </div>
     </div>
   );
 }
 
-/* ===== BATTERY DRAIN CHART (Tiny Card) ===== */
+/* ===== BATTERY DRAIN CHART (Micro Card) ===== */
 function BatteryChart({ history }) {
   if (!history || history.length < 2) return null;
-  const width = 100, height = 30, padding = 2;
+  const width = 100, height = 20, padding = 1;
   const points = history.map((h, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (h.level / 100) * (height - 2 * padding) }));
   const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
   return (
