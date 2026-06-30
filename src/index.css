@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  background: #050816;
+  color: white;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.glass {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.glow {
+  box-shadow:
+    0 0 10px #00E5FF,
+    0 0 25px #00E5FF,
+    0 0 50px #00E5FF;
+}
+
+body {
+  margin: 0;
+  color: white;
+  background:
+    radial-gradient(circle at center, rgba(0, 229, 255, 0.08), transparent 40%),
+    #050816;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ========== APPEARANCE SETTINGS ========== */
+
+/* Font Sizes */
+html.font-small body {
+  font-size: 14px;
+}
+
+html.font-medium body {
+  font-size: 16px;
+}
+
+html.font-large body {
+  font-size: 18px;
+}
+
+/* Compact Mode */
+html.compact-mode .glass {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+}
+
+html.compact-mode main {
+  padding: 1rem;
+}
+
+html.compact-mode .grid {
+  gap: 0.75rem;
+}
+
+html.compact-mode .space-y-3 > * + *,
+html.compact-mode .space-y-4 > * + *,
+html.compact-mode .space-y-6 > * + * {
+  margin-top: 0.5rem;
+}
+
+html.compact-mode input,
+html.compact-mode button {
+  padding: 0.5rem 0.75rem;
+}
+
+html.compact-mode .p-4 {
+  padding: 0.75rem;
+}
+
+html.compact-mode .p-6 {
+  padding: 1rem;
+}
+
+html.compact-mode .p-8 {
+  padding: 1.25rem;
+}
+
+/* No Animations */
+html.no-animations * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Light Theme */
+html.light-theme {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #e2e8f0;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --border-color: rgba(100, 116, 139, 0.3);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(148, 163, 184, 0.3);
+  --accent-glow: rgba(59, 130, 246, 0.4);
+}
+
+html.light-theme body {
+  background:
+    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 40%),
+    #f1f5f9;
+  color: var(--text-primary);
+}
+
+html.light-theme .glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+html.light-theme body::before {
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+}
+
+html.light-theme aside {
+  background: rgba(255, 255, 255, 0.85);
+  border-right: 1px solid var(--glass-border);
+}
+
+html.light-theme input,
+html.light-theme textarea {
+  background: white;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+html.light-theme .text-slate-400 {
+  color: var(--text-secondary) !important;
+}
+
+html.light-theme .bg-slate-900 {
+  background: white !important;
+}
+
+html.light-theme .bg-slate-800 {
+  background: #f1f5f9 !important;
+}
+
+html.light-theme .border-cyan-500\/20 {
+  border-color: var(--glass-border) !important;
+}
+
+/* Laptop View Optimizations (1024px - 1440px) */
+@media (min-width: 1024px) and (max-width: 1440px) {
+  body {
+    font-size: 15px;
+  }
+
+  .glass {
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  aside {
+    width: 280px !important;
+  }
+
+  main {
+    padding: 1.5rem !important;
+  }
+
+  .grid {
+    gap: 1.25rem !important;
+  }
+
+  .h-[85vh] {
+    height: 88vh !important;
+  }
+}
+
+/* Large Laptop / Desktop View (1440px+) */
+@media (min-width: 1440px) {
+  body {
+    font-size: 16px;
+  }
+
+  .glass {
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  aside {
+    width: 320px !important;
+  }
+
+  main {
+    padding: 2rem !important;
+  }
+
+  .grid {
+    gap: 1.5rem !important;
+  }
+
+  .h-[85vh] {
+    height: 90vh !important;
+  }
+
+  .max-w-\[85\%\] {
+    max-width: 70% !important;
+  }
+
+  .sm\:max-w-\[75\%\] {
+    max-width: 65% !important;
+  }
+}
+
+/* Laptop-specific hover effects */
+@media (min-width: 1024px) {
+  .glass {
+    transition: all 0.3s ease;
+  }
+
+  .glass:hover {
+    border-color: rgba(0, 229, 255, 0.3);
+  }
+}
+
+/* Optimize scrollbar for laptops */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.3);
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 229, 255, 0.5);
+  }
+}
+
