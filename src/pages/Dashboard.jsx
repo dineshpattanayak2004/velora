@@ -207,10 +207,10 @@ function StatCard({ label, value, sub, color, progress }) {
   );
 }
 
-/* ===== CPU LINE CHART (Micro) ===== */
+/* ===== CPU LINE CHART (Nano) ===== */
 function CPUChart({ history, current }) {
   if (!history || history.length < 2) return null;
-  const width = 100, height = 15, padding = 1;
+  const width = 100, height = 12, padding = 1;
   const points = history.map((val, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (val / 100) * (height - 2 * padding) }));
   const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
   const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
@@ -237,10 +237,10 @@ function CPUChart({ history, current }) {
   );
 }
 
-/* ===== BATTERY DRAIN CHART (Micro Card) ===== */
+/* ===== BATTERY DRAIN CHART (Nano Card) ===== */
 function BatteryChart({ history }) {
   if (!history || history.length < 2) return null;
-  const width = 100, height = 20, padding = 1;
+  const width = 100, height = 15, padding = 1;
   const points = history.map((h, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (h.level / 100) * (height - 2 * padding) }));
   const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
   return (
