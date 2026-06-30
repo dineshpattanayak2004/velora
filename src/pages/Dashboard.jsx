@@ -207,10 +207,10 @@ function StatCard({ label, value, sub, color, progress }) {
   );
 }
 
-/* ===== CPU LINE CHART ===== */
+/* ===== CPU LINE CHART (Compact) ===== */
 function CPUChart({ history, current }) {
   if (!history || history.length < 2) return null;
-  const width = 100, height = 60, padding = 4;
+  const width = 100, height = 40, padding = 3;
   const points = history.map((val, i) => ({ x: padding + (i / (history.length - 1)) * (width - 2 * padding), y: height - padding - (val / 100) * (height - 2 * padding), val }));
   const pathD = points.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(" ");
   const areaD = pathD + ` L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
